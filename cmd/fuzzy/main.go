@@ -37,7 +37,6 @@ func NewEnv(environ []string) Env {
 	return Env{m: e}
 }
 
-// main
 func main() {
 	err := Run(os.Args, NewEnv(os.Environ()), os.Stdin, os.Stdout, os.Stderr)
 	if err != nil {
@@ -83,7 +82,8 @@ func Run(args []string, env Env, stdin *os.File, stdout, stderr io.Writer) error
 	}
 	query := strings.Join(flags.Args(), " ")
 	content := fuzzy.ReadNewContent(input)
-	content.SetTextScorer(NewSmithWaterman(HasUpper(query)))
+	caseSensitive := HasUpper(query)
+	content.SetTextScorer(NewSmithWaterman(caseSensitive))
 	if *verbose {
 		content.SetVerbose()
 	}

@@ -11,20 +11,27 @@ import (
 	"github.com/rivo/tview"
 )
 
-// InputItem and item of Stringer with a Score
+type ValueStringer interface {
+	// String used for searching
+	String() string
+	// Value returned to user via stdout
+	Value() string
+}
+
+// InputItem in an item of ValueStringer with a Score
 type InputItem struct {
-	item  fmt.Stringer
+	item  ValueStringer
 	Score float64
 }
 
-func NewInputItem(item fmt.Stringer) InputItem {
+func NewInputItem(item ValueStringer) InputItem {
 	return InputItem{
 		item:  item,
 		Score: 1,
 	}
 }
 
-// InputItems can be Sorted by Score
+// InputItems can be Sorted by their Score
 type InputItems []InputItem
 
 func (i InputItems) Len() int           { return len(i) }
@@ -46,8 +53,8 @@ func (NopScorer) Compare(a, b string) float64 {
 	return 1.0
 }
 
-// SupplyNewContent creates a new Content from a slice of Stringer types
-func SupplyNewContent(input []fmt.Stringer) *Content {
+// SupplyNewContent creates a new Content from a slice of ValueStringer types
+func SupplyNewContent(input []ValueStringer) *Content {
 	ts := NopScorer{}
 	data := InputItems{}
 	for _, item := range input {
@@ -126,16 +133,16 @@ func (c *Content) Filter(query string) {
 	c.live = live
 }
 
-type Str struct {
-	content string
-}
+type Str string
 
-// NewStr returns a Stringer type from a string
+// NewStr returns a ValueStringer type from a string
 func NewStr(content string) Str {
-	return Str{content: content}
+	return Str(content)
 }
 
-func (s Str) String() string { return s.content }
+func (s Str) String() string { return string(s) }
+
+func (s Str) Value() string { return string(s) }
 
 // Find takes each line from provided content, computes the smith waterman score
 // orders the content and provides a user-interface to select an option
@@ -186,8 +193,7 @@ func FindWithScreen(screen tcell.Screen, query string, content *Content) (string
 			app.Stop()
 		}
 	}).SetSelectedFunc(func(row int, column int) {
-		cell := table.GetCell(row, column)
-		output = cell.Text
+		output = content.live[row].item.Value()
 		app.Stop()
 	})
 	if err := app.SetRoot(grid, true).EnableMouse(true).Run(); err != nil {
