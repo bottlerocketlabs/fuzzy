@@ -6,6 +6,7 @@ import (
 	"io"
 	"sort"
 
+	"github.com/bottlerocketlabs/fuzzy/algo"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
@@ -23,10 +24,6 @@ func NewInputItem(item fmt.Stringer) InputItem {
 	}
 }
 
-type TextScorer interface {
-	Compare(a, b string) float64
-}
-
 // InputItems can be Sorted by Score
 type InputItems []InputItem
 
@@ -36,21 +33,11 @@ func (i InputItems) Less(x, y int) bool { return i[x].Score > i[y].Score }
 
 // Content holds the data for the fuzzy finder
 type Content struct {
-	scorer TextScorer
+	scorer algo.TextScorer
 	tview.TableContentReadOnly
-	data InputItems
-	live InputItems
-}
-
-func NewSmithWaterman(caseSensitive bool) *SmithWatermanGotoh {
-	return &SmithWatermanGotoh{
-		CaseSensitive: caseSensitive,
-		GapPenalty:    -2,
-		Substitution: MatchMismatch{
-			Match:    1,
-			Mismatch: -2,
-		},
-	}
+	data    InputItems
+	live    InputItems
+	verbose bool
 }
 
 type NopScorer struct{}
@@ -90,8 +77,14 @@ func ReadNewContent(input io.Reader) *Content {
 	return &c
 }
 
-func (c *Content) SetTextScorer(textScorer TextScorer) {
+// SetTextScorer sets the algorithm for scoring the query against the line
+func (c *Content) SetTextScorer(textScorer algo.TextScorer) {
 	c.scorer = textScorer
+}
+
+// SetVerbose outputs the scores along with the line. useful for debugging
+func (c *Content) SetVerbose() {
+	c.verbose = true
 }
 
 func (c *Content) GetCell(row, column int) *tview.TableCell {
@@ -99,7 +92,10 @@ func (c *Content) GetCell(row, column int) *tview.TableCell {
 		return nil
 	}
 	r := c.live[row]
-	return tview.NewTableCell(fmt.Sprintf("%s %f", r.item.String(), r.Score))
+	if c.verbose {
+		return tview.NewTableCell(fmt.Sprintf("%s [%f]", r.item.String(), r.Score))
+	}
+	return tview.NewTableCell(r.item.String())
 }
 
 func (c *Content) GetColumnCount() int {

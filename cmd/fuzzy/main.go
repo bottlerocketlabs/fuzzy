@@ -10,6 +10,7 @@ import (
 	"unicode"
 
 	"github.com/bottlerocketlabs/fuzzy"
+	"github.com/bottlerocketlabs/fuzzy/algo/smithwaterman"
 )
 
 // Env is abstracted environment
@@ -53,16 +54,28 @@ func HasUpper(str string) bool {
 	return false
 }
 
+func NewSmithWaterman(caseSensitive bool) *smithwaterman.SmithWatermanGotoh {
+	return &smithwaterman.SmithWatermanGotoh{
+		CaseSensitive: caseSensitive,
+		GapPenalty:    -2,
+		Substitution: smithwaterman.MatchMismatch{
+			Match:    1,
+			Mismatch: -2,
+		},
+	}
+}
+
 // Run is the main thread but separated out so easier to test
 func Run(args []string, env Env, stdin *os.File, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("", flag.ExitOnError)
 	flags.SetOutput(stderr)
 	flags.Usage = func() {
 		fmt.Fprintf(stderr, `Usage:
-	fuzzy [query] - output selected line (fuzzy search)
+	fuzzy [options] [query] - output selected line from stdin (fuzzy search)
 `)
 		flags.PrintDefaults()
 	}
+	verbose := flags.Bool("v", false, "verbose. print out scores with text")
 	input := stdin
 	err := flags.Parse(args[1:])
 	if err != nil {
@@ -70,7 +83,10 @@ func Run(args []string, env Env, stdin *os.File, stdout, stderr io.Writer) error
 	}
 	query := strings.Join(flags.Args(), " ")
 	content := fuzzy.ReadNewContent(input)
-	content.SetTextScorer(fuzzy.NewSmithWaterman(HasUpper(query)))
+	content.SetTextScorer(NewSmithWaterman(HasUpper(query)))
+	if *verbose {
+		content.SetVerbose()
+	}
 	out, err := fuzzy.Find(query, content)
 	fmt.Fprintln(stdout, out)
 	return err

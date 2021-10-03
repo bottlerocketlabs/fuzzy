@@ -2,9 +2,13 @@
 // MIT License (MIT)
 // Copyright (c) 2019 Adrian-George Bostan <adrg@epistack.com>
 
-package fuzzy
+package smithwaterman
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/bottlerocketlabs/fuzzy/algo"
+)
 
 // SmithWatermanGotoh represents the Smith-Waterman-Gotoh metric for measuring
 // the similarity between sequences.
@@ -89,27 +93,27 @@ func (m *SmithWatermanGotoh) Compare(a, b string) float64 {
 	}
 
 	// Calculate max distance.
-	maxDistance := Minf(float64(lenA), float64(lenB)) * Maxf(subst.Max(), gap)
+	maxDistance := algo.Minf(float64(lenA), float64(lenB)) * algo.Maxf(subst.Max(), gap)
 
 	// Calculate distance.
 	v0 := make([]float64, lenB)
 	v1 := make([]float64, lenB)
 
-	distance := Maxf(0, gap, subst.Compare(runesA, 0, runesB, 0))
+	distance := algo.Maxf(0, gap, subst.Compare(runesA, 0, runesB, 0))
 	v0[0] = distance
 
 	for i := 1; i < lenB; i++ {
-		v0[i] = Maxf(0, v0[i-1]+gap, subst.Compare(runesA, 0, runesB, i))
-		distance = Maxf(distance, v0[i])
+		v0[i] = algo.Maxf(0, v0[i-1]+gap, subst.Compare(runesA, 0, runesB, i))
+		distance = algo.Maxf(distance, v0[i])
 	}
 
 	for i := 1; i < lenA; i++ {
-		v1[0] = Maxf(0, v0[0]+gap, subst.Compare(runesA, i, runesB, 0))
-		distance = Maxf(distance, v1[0])
+		v1[0] = algo.Maxf(0, v0[0]+gap, subst.Compare(runesA, i, runesB, 0))
+		distance = algo.Maxf(distance, v1[0])
 
 		for j := 1; j < lenB; j++ {
-			v1[j] = Maxf(0, v0[j]+gap, v1[j-1]+gap, v0[j-1]+subst.Compare(runesA, i, runesB, j))
-			distance = Maxf(distance, v1[j])
+			v1[j] = algo.Maxf(0, v0[j]+gap, v1[j-1]+gap, v0[j-1]+subst.Compare(runesA, i, runesB, j))
+			distance = algo.Maxf(distance, v1[j])
 		}
 
 		for j := 0; j < lenB; j++ {
@@ -150,42 +154,4 @@ func (m MatchMismatch) Max() float64 {
 // Min returns the mismatch value.
 func (m MatchMismatch) Min() float64 {
 	return m.Mismatch
-}
-
-// Minf returns the value of the smallest argument.
-func Minf(args ...float64) float64 {
-	if len(args) == 0 {
-		return 0
-	}
-	if len(args) == 1 {
-		return args[0]
-	}
-
-	min := args[0]
-	for _, arg := range args[1:] {
-		if min > arg {
-			min = arg
-		}
-	}
-
-	return min
-}
-
-// Maxf returns the value of the largest argument.
-func Maxf(args ...float64) float64 {
-	if len(args) == 0 {
-		return 0
-	}
-	if len(args) == 1 {
-		return args[0]
-	}
-
-	max := args[0]
-	for _, arg := range args[1:] {
-		if max < arg {
-			max = arg
-		}
-	}
-
-	return max
 }
