@@ -6,6 +6,7 @@ import (
 	"io"
 	"math"
 	"sort"
+	"strings"
 
 	"github.com/bottlerocketlabs/fuzzy/algo"
 	"github.com/gdamore/tcell/v2"
@@ -142,6 +143,16 @@ func (c *Content) GetRowCount() int {
 	return len(c.live)
 }
 
+func removeEmpty(in []string) []string {
+	var out []string
+	for _, str := range in {
+		if str != "" {
+			out = append(out, str)
+		}
+	}
+	return out
+}
+
 // Filter processes InputItems, scores them with SmithWaterman
 // Any items with score less than 1 are not shown
 // Items are sorted by their score
@@ -154,8 +165,13 @@ func (c *Content) Filter(query string) {
 		items: []InputItem{},
 		query: query,
 	}
+	queryParts := removeEmpty(strings.Split(query, " "))
 	for _, item := range c.data {
-		item.Score = c.scorer.Compare(item.item.String(), query)
+		var score float64
+		for _, part := range queryParts {
+			score = score + c.scorer.Compare(item.item.String(), part)
+		}
+		item.Score = score / float64(len(queryParts))
 		if item.Score < c.hideLessThan {
 			continue
 		}
