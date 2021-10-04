@@ -74,7 +74,7 @@ func Run(args []string, env Env, stdin *os.File, stdout, stderr io.Writer) error
 `)
 		flags.PrintDefaults()
 	}
-	verbose := flags.Bool("v", false, "verbose. print out scores with text")
+	verbose := flags.Bool("v", false, "verbose. print out all scores with text")
 	input := stdin
 	err := flags.Parse(args[1:])
 	if err != nil {
@@ -84,8 +84,10 @@ func Run(args []string, env Env, stdin *os.File, stdout, stderr io.Writer) error
 	content := fuzzy.ReadNewContent(input)
 	caseSensitive := HasUpper(query)
 	content.SetTextScorer(NewSmithWaterman(caseSensitive))
+	content.SetReturnOneResult()
 	if *verbose {
 		content.SetVerbose()
+		content.SetHideLessThan(0)
 	}
 	out, err := fuzzy.Find(query, content)
 	fmt.Fprintln(stdout, out)

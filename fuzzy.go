@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"math"
 	"sort"
 
 	"github.com/bottlerocketlabs/fuzzy/algo"
@@ -31,20 +32,34 @@ func NewInputItem(item ValueStringer) InputItem {
 	}
 }
 
-// InputItems can be Sorted by their Score
-type InputItems []InputItem
+// SortableInputItems can be Sorted by their Score and difference in length of query
+type SortableInputItems struct {
+	items []InputItem
+	query string
+}
 
-func (i InputItems) Len() int           { return len(i) }
-func (i InputItems) Swap(x, y int)      { i[x], i[y] = i[y], i[x] }
-func (i InputItems) Less(x, y int) bool { return i[x].Score > i[y].Score }
+func (i SortableInputItems) Len() int      { return len(i.items) }
+func (i SortableInputItems) Swap(x, y int) { i.items[x], i.items[y] = i.items[y], i.items[x] }
+func (i SortableInputItems) Less(x, y int) bool {
+	if i.items[x].Score < i.items[y].Score {
+		return true
+	}
+	// If Score matches sort by length difference to Query
+	if math.Abs(float64(len(i.query)-len(i.items[x].item.String()))) > math.Abs(float64(len(i.query)-len(i.items[y].item.String()))) {
+		return true
+	}
+	return false
+}
 
 // Content holds the data for the fuzzy finder
 type Content struct {
 	scorer algo.TextScorer
 	tview.TableContentReadOnly
-	data    InputItems
-	live    InputItems
-	verbose bool
+	data            []InputItem
+	live            []InputItem
+	verbose         bool
+	hideLessThan    float64
+	returnOneResult bool
 }
 
 type NopScorer struct{}
@@ -56,14 +71,16 @@ func (NopScorer) Compare(a, b string) float64 {
 // SupplyNewContent creates a new Content from a slice of ValueStringer types
 func SupplyNewContent(input []ValueStringer) *Content {
 	ts := NopScorer{}
-	data := InputItems{}
+	data := []InputItem{}
 	for _, item := range input {
 		data = append(data, NewInputItem(item))
 	}
 	c := Content{
-		scorer: ts,
-		data:   data,
-		live:   data,
+		scorer:          ts,
+		data:            data,
+		live:            data,
+		hideLessThan:    1,
+		returnOneResult: false,
 	}
 	return &c
 }
@@ -71,15 +88,17 @@ func SupplyNewContent(input []ValueStringer) *Content {
 // ReadNewContent creates a new Content from new line separated input
 func ReadNewContent(input io.Reader) *Content {
 	ts := NopScorer{}
-	data := InputItems{}
+	data := []InputItem{}
 	scanner := bufio.NewScanner(input)
 	for scanner.Scan() {
 		data = append(data, NewInputItem(NewStr(scanner.Text())))
 	}
 	c := Content{
-		scorer: ts,
-		data:   data,
-		live:   data,
+		scorer:          ts,
+		data:            data,
+		live:            data,
+		hideLessThan:    1,
+		returnOneResult: false,
 	}
 	return &c
 }
@@ -92,6 +111,16 @@ func (c *Content) SetTextScorer(textScorer algo.TextScorer) {
 // SetVerbose outputs the scores along with the line. useful for debugging
 func (c *Content) SetVerbose() {
 	c.verbose = true
+}
+
+// SetReturnOneResult returns the one result immediatly if a passed in query only matches one item
+func (c *Content) SetReturnOneResult() {
+	c.returnOneResult = true
+}
+
+// SetHideLessThan remove item from output with a lower score
+func (c *Content) SetHideLessThan(score float64) {
+	c.hideLessThan = score
 }
 
 func (c *Content) GetCell(row, column int) *tview.TableCell {
@@ -114,23 +143,27 @@ func (c *Content) GetRowCount() int {
 }
 
 // Filter processes InputItems, scores them with SmithWaterman
-// Any items with score less than 0 are not shown
+// Any items with score less than 1 are not shown
 // Items are sorted by their score
 func (c *Content) Filter(query string) {
 	if query == "" {
 		c.live = c.data
 		return
 	}
-	var live InputItems
+	live := SortableInputItems{
+		items: []InputItem{},
+		query: query,
+	}
 	for _, item := range c.data {
 		item.Score = c.scorer.Compare(item.item.String(), query)
-		if item.Score < 1 {
+		if item.Score < c.hideLessThan {
 			continue
 		}
-		live = append(live, item)
+		live.items = append(live.items, item)
 	}
-	sort.Sort(live)
-	c.live = live
+	sort.Sort(sort.Reverse(live))
+	//sort.Sort(live)
+	c.live = live.items
 }
 
 type Str string
@@ -141,8 +174,7 @@ func NewStr(content string) Str {
 }
 
 func (s Str) String() string { return string(s) }
-
-func (s Str) Value() string { return string(s) }
+func (s Str) Value() string  { return string(s) }
 
 // Find takes each line from provided content, computes the smith waterman score
 // orders the content and provides a user-interface to select an option
@@ -180,6 +212,11 @@ func FindWithScreen(screen tcell.Screen, query string, content *Content) (string
 		}
 		return event
 	})
+
+	content.Filter(query)
+	if content.GetRowCount() == 1 && content.returnOneResult {
+		return content.live[0].item.Value(), nil
+	}
 	inputField.SetText(query)
 	grid := tview.NewGrid().
 		SetRows(0, 1).

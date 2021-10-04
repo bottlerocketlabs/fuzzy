@@ -7,7 +7,7 @@ package smithwaterman
 import (
 	"strings"
 
-	"github.com/bottlerocketlabs/fuzzy/algo"
+	"github.com/bottlerocketlabs/fuzzy/algo/smithwaterman/util"
 )
 
 // SmithWatermanGotoh represents the Smith-Waterman-Gotoh metric for measuring
@@ -93,27 +93,27 @@ func (m *SmithWatermanGotoh) Compare(a, b string) float64 {
 	}
 
 	// Calculate max distance.
-	maxDistance := algo.Minf(float64(lenA), float64(lenB)) * algo.Maxf(subst.Max(), gap)
+	maxDistance := util.Minf(float64(lenA), float64(lenB)) * util.Maxf(subst.Max(), gap)
 
 	// Calculate distance.
 	v0 := make([]float64, lenB)
 	v1 := make([]float64, lenB)
 
-	distance := algo.Maxf(0, gap, subst.Compare(runesA, 0, runesB, 0))
+	distance := util.Maxf(0, gap, subst.Compare(runesA, 0, runesB, 0))
 	v0[0] = distance
 
 	for i := 1; i < lenB; i++ {
-		v0[i] = algo.Maxf(0, v0[i-1]+gap, subst.Compare(runesA, 0, runesB, i))
-		distance = algo.Maxf(distance, v0[i])
+		v0[i] = util.Maxf(0, v0[i-1]+gap, subst.Compare(runesA, 0, runesB, i))
+		distance = util.Maxf(distance, v0[i])
 	}
 
 	for i := 1; i < lenA; i++ {
-		v1[0] = algo.Maxf(0, v0[0]+gap, subst.Compare(runesA, i, runesB, 0))
-		distance = algo.Maxf(distance, v1[0])
+		v1[0] = util.Maxf(0, v0[0]+gap, subst.Compare(runesA, i, runesB, 0))
+		distance = util.Maxf(distance, v1[0])
 
 		for j := 1; j < lenB; j++ {
-			v1[j] = algo.Maxf(0, v0[j]+gap, v1[j-1]+gap, v0[j-1]+subst.Compare(runesA, i, runesB, j))
-			distance = algo.Maxf(distance, v1[j])
+			v1[j] = util.Maxf(0, v0[j]+gap, v1[j-1]+gap, v0[j-1]+subst.Compare(runesA, i, runesB, j))
+			distance = util.Maxf(distance, v1[j])
 		}
 
 		for j := 0; j < lenB; j++ {

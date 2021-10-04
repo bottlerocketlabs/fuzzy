@@ -1,4 +1,4 @@
-package algo
+package util
 
 // Minf returns the value of the smallest argument.
 func Minf(args ...float64) float64 {
