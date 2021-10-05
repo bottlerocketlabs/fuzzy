@@ -52,6 +52,22 @@ func (i SortableInputItems) Less(x, y int) bool {
 	return false
 }
 
+type Str string
+
+// NewStr returns a ValueStringer type from a string
+func NewStr(content string) Str {
+	return Str(content)
+}
+
+func (s Str) String() string { return string(s) }
+func (s Str) Value() string  { return string(s) }
+
+type NopScorer struct{}
+
+func (NopScorer) Compare(a, b string) float64 {
+	return 1.0
+}
+
 // Content holds the data for the fuzzy finder
 type Content struct {
 	scorer algo.TextScorer
@@ -63,45 +79,33 @@ type Content struct {
 	returnOneResult bool
 }
 
-type NopScorer struct{}
-
-func (NopScorer) Compare(a, b string) float64 {
-	return 1.0
-}
-
 // SupplyNewContent creates a new Content from a slice of ValueStringer types
 func SupplyNewContent(input []ValueStringer) *Content {
-	ts := NopScorer{}
 	data := []InputItem{}
 	for _, item := range input {
 		data = append(data, NewInputItem(item))
 	}
-	c := Content{
-		scorer:          ts,
-		data:            data,
-		live:            data,
-		hideLessThan:    1,
-		returnOneResult: false,
-	}
-	return &c
+	return newContent(data)
 }
 
 // ReadNewContent creates a new Content from new line separated input
 func ReadNewContent(input io.Reader) *Content {
-	ts := NopScorer{}
 	data := []InputItem{}
 	scanner := bufio.NewScanner(input)
 	for scanner.Scan() {
 		data = append(data, NewInputItem(NewStr(scanner.Text())))
 	}
-	c := Content{
-		scorer:          ts,
+	return newContent(data)
+}
+
+func newContent(data []InputItem) *Content {
+	return &Content{
+		scorer:          NopScorer{},
 		data:            data,
 		live:            data,
 		hideLessThan:    1,
 		returnOneResult: false,
 	}
-	return &c
 }
 
 // SetTextScorer sets the algorithm for scoring the query against the line
@@ -181,16 +185,6 @@ func (c *Content) Filter(query string) {
 	//sort.Sort(live)
 	c.live = live.items
 }
-
-type Str string
-
-// NewStr returns a ValueStringer type from a string
-func NewStr(content string) Str {
-	return Str(content)
-}
-
-func (s Str) String() string { return string(s) }
-func (s Str) Value() string  { return string(s) }
 
 // Find takes each line from provided content, computes the smith waterman score
 // orders the content and provides a user-interface to select an option
