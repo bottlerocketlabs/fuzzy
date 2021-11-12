@@ -13,6 +13,7 @@ import (
 	"github.com/rivo/tview"
 )
 
+// ValueStringer has a value and a string output, potentially different
 type ValueStringer interface {
 	// String used for searching
 	String() string
@@ -20,7 +21,12 @@ type ValueStringer interface {
 	Value() string
 }
 
-// InputItem in an item of ValueStringer with a Score
+//EnumerableValueStringer is iterable
+type EnumerableValueStringer interface {
+	Each(handler func(ValueStringer))
+}
+
+// InputItem is an item of ValueStringer with a Score
 type InputItem struct {
 	item  ValueStringer
 	Score float64
@@ -52,6 +58,45 @@ func (i SortableInputItems) Less(x, y int) bool {
 	return false
 }
 
+// StrMapEntry implements ValueStringer
+type StrMapEntry struct {
+	Val string
+	Str string
+}
+
+func (s StrMapEntry) String() string { return s.Str }
+func (s StrMapEntry) Value() string  { return s.Val }
+
+// NewStrMap is a utility function to convert a string map
+func NewStrMap(m map[string]string) StrMap { return StrMap(m) }
+
+// StrMap uses the key as Value and value as String
+type StrMap map[string]string
+
+// Each allows iteration over the string map
+func (m StrMap) Each(f func(ValueStringer)) {
+	for v, s := range m {
+		f(StrMapEntry{
+			Val: v,
+			Str: s,
+		})
+	}
+}
+
+// NewStrList is a utility fuction to convert a string slice
+func NewStrList(s []string) StrList { return StrList(s) }
+
+// StrList is a simple string slice
+type StrList []string
+
+// Each allows iteration over the string slice
+func (l StrList) Each(f func(ValueStringer)) {
+	for _, v := range l {
+		f(NewStr(v))
+	}
+}
+
+// Str is a simple string type
 type Str string
 
 // NewStr returns a ValueStringer type from a string
@@ -80,11 +125,11 @@ type Content struct {
 }
 
 // SupplyNewContent creates a new Content from a slice of ValueStringer types
-func SupplyNewContent(input []ValueStringer) *Content {
+func SupplyNewContent(input EnumerableValueStringer) *Content {
 	data := []InputItem{}
-	for _, item := range input {
-		data = append(data, NewInputItem(item))
-	}
+	input.Each(func(vs ValueStringer) {
+		data = append(data, NewInputItem(vs))
+	})
 	return newContent(data)
 }
 
